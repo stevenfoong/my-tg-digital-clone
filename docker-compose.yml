@@ -1,0 +1,24 @@
+services:
+  bot:
+    image: ghcr.io/stevenfoong/my-tg-digital-clone:latest
+    container_name: tg-digital-clone
+    env_file: .env
+    volumes:
+      - ./data:/data          # SQLite buffer, prompts.yaml, Telethon session
+    restart: unless-stopped
+    # If Ollama runs as a container on this same host, you can join its network
+    # and use LLM_BASE_URL=http://ollama_brain:11434 instead of the tunnel URL:
+    # networks: [ollama]
+
+  # Optional: pull new images automatically after each push to GitHub.
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --interval 300 --cleanup tg-digital-clone
+  #   restart: unless-stopped
+
+# networks:
+#   ollama:
+#     external: true
+#     name: <the network your ollama_brain container uses>

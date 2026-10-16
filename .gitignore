@@ -1,0 +1,16 @@
+# Secrets and runtime data: never commit these
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+data/
+prompts.yaml
+!prompts.example.yaml
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
