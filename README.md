@@ -54,8 +54,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Don't know a group's id? Leave `BOT_1_GROUPS` empty, start the bot, and send a
-message in the group: the bot will privately send you its id.
+Don't know a group's id or your own user id? Start the bot and send `/whoami` in the
+group, or in a private chat with the bot.
 
 If `docker pull` says *unauthorized*, the image is private: either make the
 package public (GitHub → your profile → Packages → this package → Package
@@ -83,6 +83,8 @@ If it ever leaks: Telegram → Settings → Devices → terminate that session.
   Replying to a suggestion message with text does the same.
 - 📤 **Send N** → ✅ **Confirm** posts it as you, as a reply to the original message.
 - `/status` shows what's running, `/reload` re-reads `data/prompts.yaml`.
+- `/whoami` in a group replies with the group's chat id (works even before the group
+  is listed in `.env`); in a private chat it replies with your user id (for `OWNER_ID`).
 
 ## Updating
 

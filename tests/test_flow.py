@@ -247,3 +247,25 @@ async def test_strangers_are_ignored(env):
     }})
     await feed(upd)
     assert session.of(SendMessage) == []
+
+
+async def test_whoami_in_group_and_private(env):
+    cfg, session, bot, llm, me, service, feed = env
+
+    def cmd(chat):
+        return Update.model_validate({"update_id": next(_uid), "message": {
+            "message_id": next(_uid), "date": 1, "chat": chat,
+            "from": {"id": 999, "is_bot": False, "first_name": "X"}, "text": "/whoami",
+            "entities": [{"type": "bot_command", "offset": 0, "length": 7}],
+        }})
+
+    # Works in an unlisted group too, and doesn't trigger the "not in my list" notice.
+    await feed(cmd({"id": -100777, "type": "supergroup", "title": "New Group"}))
+    reply = session.of(SendMessage)[-1]
+    assert reply.chat_id == -100777 and "-100777" in reply.text and "New Group" in reply.text
+    assert not any("not in my list" in m.text for m in session.of(SendMessage))
+
+    # In a private chat it answers with the sender's own id (anyone, not only the owner).
+    await feed(cmd({"id": 999, "type": "private"}))
+    reply = session.of(SendMessage)[-1]
+    assert reply.chat_id == 999 and "Your user id: <code>999</code>" in reply.text

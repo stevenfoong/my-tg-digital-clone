@@ -34,7 +34,7 @@ HELP = (
     "• Use the buttons to switch between Reply / Acknowledge / Gather info, or tap Custom "
     "(or reply to my message) to tell me what you want to say.\n"
     "• Reply to a suggestion with <code>/send your text</code> to send exactly that as you.\n\n"
-    "Commands: /status · /reload (re-read prompts.yaml)"
+    "Commands: /status · /reload (re-read prompts.yaml) · /whoami (show this chat's id)"
 )
 
 
@@ -70,6 +70,24 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
 
     def is_owner(user) -> bool:
         return bool(user and user.id == owner)
+
+    # ---------------- /whoami (anyone, any chat) ----------------
+    # Registered first so it also works in groups that aren't listed yet,
+    # which is exactly when you need a group's id.
+
+    @router.message(Command("whoami"))
+    async def cmd_whoami(message: Message) -> None:
+        chat = message.chat
+        if chat.type in GROUP_TYPES:
+            text = (
+                f"<b>{escape(chat.title or 'This group')}</b>\n"
+                f"Group chat id: <code>{chat.id}</code>"
+            )
+        elif chat.type == "private" and message.from_user:
+            text = f"Your user id: <code>{message.from_user.id}</code>"
+        else:
+            text = f"Chat id: <code>{chat.id}</code>"
+        await message.reply(text, parse_mode="HTML")
 
     # ---------------- private chat with the owner ----------------
 
