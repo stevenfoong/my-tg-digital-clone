@@ -112,7 +112,7 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
             f"This bot watches: {groups}\n"
             f"Model: <code>{escape(cfg.llm.model)}</code> ({cfg.llm.api})\n"
             f"Send as me: {me_state}\n"
-            f"Prompts file: {'loaded' if cfg.prompts_file and cfg.prompts_file.exists() else 'defaults'}"
+            f"Prompts: {escape(service.prompts.status)}"
         )
         await message.answer(text, parse_mode="HTML")
 
@@ -120,8 +120,8 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
     async def cmd_reload(message: Message) -> None:
         if not is_owner(message.from_user):
             return
-        service.prompts.reload()
-        await message.answer("Prompts reloaded.")
+        status = service.prompts.reload()
+        await message.answer(f"Prompts {escape(status)}", parse_mode="HTML")
 
     @router.message(F.chat.type == "private", Command("send"))
     async def cmd_send(message: Message, bot: Bot) -> None:

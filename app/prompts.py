@@ -53,7 +53,9 @@ DEFAULTS: dict[str, str] = {
     ),
     "mode_custom": (
         "Draft a reply that says what I intend to say (my intent is given below), "
-        "phrased politely and fitting the conversation."
+        "phrased politely and fitting the conversation. My intent is a rough note: "
+        "keep its meaning, but rewrite it fully in my style, even if the note itself "
+        "is casual, short or ungrammatical."
     ),
 }
 
@@ -62,24 +64,35 @@ class Prompts:
     def __init__(self, path: Path | None):
         self.values = dict(DEFAULTS)
         self.path = path
+        self.status = "defaults"
         self.reload()
 
-    def reload(self) -> None:
+    def reload(self) -> str:
+        """Re-read the prompts file. Returns a short human-readable status."""
         values = dict(DEFAULTS)
-        if self.path and self.path.exists():
+        if not self.path or not self.path.exists():
+            self.status = f"defaults (no file at {self.path})"
+        else:
             try:
                 loaded = yaml.safe_load(self.path.read_text(encoding="utf-8")) or {}
                 if not isinstance(loaded, dict):
-                    raise ValueError("top level must be a mapping")
+                    raise ValueError("top level must be key: value pairs")
+                used, unknown = [], []
                 for key, val in loaded.items():
                     if key in DEFAULTS and isinstance(val, str) and val.strip():
                         values[key] = val.strip()
+                        used.append(key)
                     elif key not in DEFAULTS:
-                        log.warning("prompts file: unknown key %r ignored", key)
-                log.info("Loaded prompts from %s", self.path)
+                        unknown.append(str(key))
+                self.status = "loaded: " + (", ".join(used) if used else "no custom keys")
+                if unknown:
+                    self.status += f" (ignored unknown: {', '.join(unknown)})"
+                log.info("Prompts %s from %s", self.status, self.path)
             except Exception as exc:  # keep running on a bad file
-                log.error("Could not read prompts file %s: %s (using defaults)", self.path, exc)
+                self.status = f"ERROR, using defaults: {exc}"
+                log.error("Could not read prompts file %s: %s", self.path, exc)
         self.values = values
+        return self.status
 
     def build(
         self,

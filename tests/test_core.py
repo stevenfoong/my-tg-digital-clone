@@ -222,3 +222,22 @@ async def test_forbidden_is_reported():
 
     with pytest.raises(LLMError, match="service token"):
         await _client(handler).draft("s", "u", 3)
+
+
+def test_prompts_file_created_after_start_is_picked_up_by_reload(tmp_path):
+    f = tmp_path / "prompts.yaml"
+    p = Prompts(f)
+    assert p.status.startswith("defaults")
+    f.write_text("style: |\n  Very formal.\nfoo: bar\n", encoding="utf-8")
+    status = p.reload()
+    assert status.startswith("loaded: style") and "foo" in status
+    assert p.values["style"] == "Very formal."
+    f.write_text("style: [unclosed\n", encoding="utf-8")
+    assert p.reload().startswith("ERROR")
+
+
+def test_config_defaults_prompts_path(monkeypatch, tmp_path):
+    _base_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("BOT_1_TOKEN", "123:aaa")
+    monkeypatch.delenv("PROMPTS_FILE", raising=False)
+    assert load_config().prompts_file == tmp_path / "prompts.yaml"

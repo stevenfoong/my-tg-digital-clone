@@ -216,9 +216,9 @@ def load_config() -> Config:
         raise ConfigError("TELETHON_ENABLED=true needs TG_API_ID and TG_API_HASH")
 
     prompts_raw = _env("PROMPTS_FILE")
-    prompts_file = Path(prompts_raw) if prompts_raw else None
-    if prompts_file is None and (data_dir / "prompts.yaml").exists():
-        prompts_file = data_dir / "prompts.yaml"
+    # Always point at a path, even if the file doesn't exist yet, so a file
+    # created later is picked up by /reload without restarting.
+    prompts_file = Path(prompts_raw) if prompts_raw else data_dir / "prompts.yaml"
 
     cfg = Config(
         bots=bots,
