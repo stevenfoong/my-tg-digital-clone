@@ -9,10 +9,11 @@ from aiogram.client.session.base import BaseSession
 from aiogram.methods import (
     AnswerCallbackQuery,
     EditMessageText,
+    GetChat,
     SendMessage,
     TelegramMethod,
 )
-from aiogram.types import Chat, Message, Update
+from aiogram.types import Chat, ChatFullInfo, Message, Update
 
 from app.config import BotConfig, Config, LLMConfig, TelethonConfig
 from app.db import Store
@@ -41,6 +42,12 @@ class FakeSession(BaseSession):
             )
         if isinstance(method, (EditMessageText, AnswerCallbackQuery)):
             return True
+        if isinstance(method, GetChat):
+            # model_construct skips validation, so this keeps working as the
+            # Bot API adds required fields to ChatFullInfo.
+            return ChatFullInfo.model_construct(
+                id=method.chat_id, type="supergroup", title=f"Group {method.chat_id}",
+            )
         return True
 
     async def close(self):
@@ -294,3 +301,47 @@ async def test_choose_first_then_mode_button(env):
     await feed(group_msg(1, 6, "Ben", "Steven server down"))
     await feed(button("m:1:ack"))
     assert len(llm.prompts) == 1 and "acknowledgement" in llm.prompts[0][1]
+
+
+async def test_draft_single_group_then_adjust_and_send(env):
+    cfg, session, bot, llm, me, service, feed = env
+    await feed(group_msg(1, 5, "Ann", "anyone know when the VPN upgrade is?"))
+    await feed(private_msg("/draft vpn maintenance tonight 11pm, 15 min downtime"))
+    system, user = llm.prompts[-1]
+    assert "NEW message" in user and "Target message" not in user
+    assert "Ann: anyone know" in user and "11pm" in user
+    s = service.store.get_suggestion(1)
+    assert s.source == "compose" and s.chat_id == GROUP and s.chat_title == f"Group {GROUP}"
+    final = session.of(EditMessageText)[-1]
+    assert "New message to" in final.text and "draft 1" in final.text
+    labels = [b.text for row in final.reply_markup.inline_keyboard for b in row]
+    assert labels == ["📤 Send 1", "📤 Send 2", "📤 Send 3", "🔄 Regenerate"]
+
+    await feed(private_msg("mention it is for NetBird too", reply_to_id=s.owner_msg_id))
+    assert "Adjustment: mention it is for NetBird too" in llm.prompts[-1][1]
+    assert service.store.get_suggestion(1).mode == "new"
+
+    await feed(button("y:1:1"))
+    assert me.sent == [(GROUP, "draft 1", None)]  # a new message, not a reply
+
+
+async def test_draft_asks_which_group(env):
+    cfg, session, bot, llm, me, service, feed = env
+    service.bot_cfgs[bot.id].groups.append(-100555)
+    await feed(private_msg("/draft hello all"))
+    assert llm.prompts == []
+    ask = session.of(SendMessage)[-1]
+    assert "Which group" in ask.text
+    labels = [b.text for row in ask.reply_markup.inline_keyboard for b in row]
+    assert labels == [f"Group {GROUP}", "Group -100555", "✖ Cancel"]
+    await feed(button("g:1:-100555"))
+    assert service.store.get_suggestion(1).chat_id == -100555
+    assert len(llm.prompts) == 1
+    await feed(button("g:1:-100999"))  # not a listed group: ignored
+    assert service.store.get_suggestion(1).chat_id == -100555
+
+
+async def test_draft_without_text_shows_usage(env):
+    cfg, session, bot, llm, me, service, feed = env
+    await feed(private_msg("/draft"))
+    assert "/draft remind everyone" in session.of(SendMessage)[-1].text

@@ -216,6 +216,49 @@ class Service:
         if self.cfg.auto_draft:
             await self.redraft(sid, note=note)
 
+    # ---- composing a new message (/draft) ------------------------------------
+
+    async def group_titles(self, bot_id: int) -> list[tuple[int, str]]:
+        bot = self.bots[bot_id]
+        out = []
+        for gid in self.bot_cfgs[bot_id].groups:
+            try:
+                chat = await bot.get_chat(gid)
+                out.append((gid, chat.title or str(gid)))
+            except Exception:
+                out.append((gid, str(gid)))
+        return out
+
+    async def start_compose(self, bot_id: int, intent: str) -> None:
+        groups = await self.group_titles(bot_id)
+        if not groups:
+            await self.notify_owner(bot_id, "I'm not watching any groups yet, so there's nowhere to post.")
+            return
+        sid = self.store.create_suggestion(
+            bot_id=bot_id, source="compose", chat_id=None, chat_title=None,
+            target_text=intent, context="", mode="new", intent=intent,
+        )
+        s = self.store.get_suggestion(sid)
+        assert s
+        bot = self.bots[bot_id]
+        if len(groups) == 1:
+            msg = await bot.send_message(self.cfg.owner_id, fmt.drafting(s), parse_mode="HTML")
+            self.store.update_suggestion(sid, owner_msg_id=msg.message_id)
+            await self.choose_group(sid, *groups[0])
+            return
+        text, markup = fmt.pick_group(s, groups)
+        msg = await bot.send_message(self.cfg.owner_id, text, parse_mode="HTML", reply_markup=markup)
+        self.store.update_suggestion(sid, owner_msg_id=msg.message_id)
+
+    async def choose_group(self, sid: int, chat_id: int, title: str) -> None:
+        s = self.store.get_suggestion(sid)
+        if not s or chat_id not in self.bot_cfgs[s.bot_id].groups:
+            return
+        self.store.update_suggestion(
+            sid, chat_id=chat_id, chat_title=title, context=self._group_context(chat_id, 0),
+        )
+        await self.redraft(sid)
+
     async def redraft(self, sid: int, mode: str | None = None, intent: str | None = None,
                       fresh: bool = False, note: str | None = None) -> None:
         s = self.store.get_suggestion(sid)

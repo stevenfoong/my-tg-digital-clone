@@ -16,6 +16,7 @@ MODE_LABELS = {
     "ack": "👍 Acknowledge",
     "gather": "🔎 Gather info",
     "custom": "✍️ Custom",
+    "new": "📝 New message",
 }
 
 DEFAULTS: dict[str, str] = {
@@ -50,6 +51,12 @@ DEFAULTS: dict[str, str] = {
         "THIS specific problem, to diagnose or act on it. Skip trivial checks that do not "
         "fit the context (e.g. 'is it plugged in' for a cloud server). Ask at most 3-5 "
         "focused questions, grouped naturally, and keep it friendly."
+    ),
+    "mode_new": (
+        "Draft a NEW message that I will post to start a conversation or make an "
+        "announcement in this chat. It is not a reply to anyone. Convey my intent "
+        "(given below) clearly and completely, using the recent conversation only as "
+        "background. If the intent is a request, say what is needed and by when if given."
     ),
     "mode_custom": (
         "Draft a reply that says what I intend to say (my intent is given below), "
@@ -120,7 +127,8 @@ class Prompts:
         if chat_title:
             parts.append(f"Chat: {chat_title}")
         parts.append("Conversation so far (oldest first; 'Me' is me):\n" + (context or "(no earlier messages)"))
-        parts.append(f"Target message from {target_sender}:\n{target_text}")
+        if mode != "new":
+            parts.append(f"Target message from {target_sender}:\n{target_text}")
         parts.append(f"Task: {task}")
         if intent:
             parts.append(f"My intent: {intent}")

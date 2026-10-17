@@ -19,6 +19,9 @@ def _clip(text: str, limit: int) -> str:
 def header(s: Suggestion) -> str:
     who = escape(s.target_sender_name or "Someone")
     where = escape(s.chat_title or "a chat")
+    if s.source == "compose":
+        dest = f"<b>{where}</b>" if s.chat_id is not None else "<i>choose a group</i>"
+        return f"📝 New message to {dest}\n<blockquote>{escape(_clip(s.target_text, 700))}</blockquote>"
     if s.source == "group":
         top = f"🔔 <b>{where}</b>\n{who} {escape(s.reason or 'mentioned you')}:"
     else:
@@ -30,18 +33,25 @@ def header(s: Suggestion) -> str:
 def body(s: Suggestion, note: str | None = None) -> str:
     parts = [header(s)]
     label = MODE_LABELS.get(s.mode, s.mode)
-    if s.intent:
+    if s.intent and s.source != "compose":
         parts.append(f"<b>{label}</b> · <i>{escape(_clip(s.intent, 200))}</i>")
     else:
         parts.append(f"<b>{label}</b>")
     if s.drafts:
         for i, d in enumerate(s.drafts, 1):
             parts.append(f"{i}. <code>{escape(d)}</code>")
-        parts.append(
-            "<i>Tap a draft to copy it. Reply to this message with what you want to say "
-            "for a custom draft, or reply with</i> <code>/send your text</code> "
-            "<i>to send exactly that.</i>"
-        )
+        if s.source == "compose":
+            parts.append(
+                "<i>Tap a draft to copy it. Reply to this message with changes "
+                "(e.g. mention the deadline is Friday) to redraft, or reply with</i> "
+                "<code>/send your text</code> <i>to send exactly that.</i>"
+            )
+        else:
+            parts.append(
+                "<i>Tap a draft to copy it. Reply to this message with what you want to say "
+                "for a custom draft, or reply with</i> <code>/send your text</code> "
+                "<i>to send exactly that.</i>"
+            )
     if note:
         parts.append(note)
     text = "\n\n".join(parts)
@@ -83,6 +93,15 @@ def choose_keyboard(s: Suggestion) -> InlineKeyboardMarkup:
     ])
 
 
+def pick_group(s: Suggestion, groups: list[tuple[int, str]]) -> tuple[str, InlineKeyboardMarkup]:
+    rows = [
+        [InlineKeyboardButton(text=title[:60], callback_data=f"g:{s.id}:{gid}")]
+        for gid, title in groups
+    ]
+    rows.append([InlineKeyboardButton(text="✖ Cancel", callback_data=f"x:{s.id}")])
+    return f"{header(s)}\n\n<b>Which group should this go to?</b>", InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def can_send(s: Suggestion, me_ready: bool) -> bool:
     return me_ready and s.chat_id is not None and not s.sent
 
@@ -94,6 +113,9 @@ def keyboard(s: Suggestion, me_ready: bool) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=f"📤 Send {i}", callback_data=f"s:{s.id}:{i}")
             for i in range(1, len(s.drafts) + 1)
         ])
+    if s.source == "compose":
+        rows.append([InlineKeyboardButton(text="🔄 Regenerate", callback_data=f"r:{s.id}")])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
     modes = []
     for mode in ("reply", "ack", "gather"):
         if mode != s.mode:

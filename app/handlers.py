@@ -34,6 +34,7 @@ HELP = (
     "• Use the buttons to switch between Reply / Acknowledge / Gather info, or tap Custom "
     "(or reply to my message) to tell me what you want to say.\n"
     "• Reply to a suggestion with <code>/send your text</code> to send exactly that as you.\n\n"
+    "• <code>/draft what you want to say</code> drafts a new message for one of your groups.\n\n"
     "Commands: /status · /reload (re-read prompts.yaml) · /whoami (show this chat's id)"
 )
 
@@ -123,6 +124,21 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
         status = service.prompts.reload()
         await message.answer(f"Prompts {escape(status)}", parse_mode="HTML")
 
+    @router.message(F.chat.type == "private", Command("draft"))
+    async def cmd_draft(message: Message, bot: Bot) -> None:
+        if not is_owner(message.from_user):
+            return
+        parts = (message.text or "").split(maxsplit=1)
+        intent = parts[1].strip() if len(parts) > 1 else ""
+        if not intent:
+            await message.answer(
+                "Tell me what you want to say, e.g.\n"
+                "<code>/draft remind everyone the VPN maintenance is tonight 11pm, expect 15 min downtime</code>",
+                parse_mode="HTML",
+            )
+            return
+        await service.start_compose(bot.id, intent)
+
     @router.message(F.chat.type == "private", Command("send"))
     async def cmd_send(message: Message, bot: Bot) -> None:
         if not is_owner(message.from_user):
@@ -185,6 +201,14 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
             sid = s.id if s else None
         if sid is None:
             await message.answer("Reply to one of my suggestions to give a custom instruction.")
+            return
+        s = service.store.get_suggestion(sid)
+        if s and s.source == "compose":
+            if s.chat_id is None:
+                await message.answer("Pick a group first.")
+                return
+            # Treat the reply as an extra instruction on top of the original intent.
+            await service.redraft(sid, intent=f"{s.intent or s.target_text}\nAdjustment: {message.text.strip()}")
             return
         await service.redraft(sid, mode="custom", intent=message.text.strip())
 
@@ -250,6 +274,16 @@ def build_router(service: Service, detector: MentionDetector) -> Router:
         elif action == "n":
             await query.answer("Cancelled")
             await service.refresh_view(sid)
+        elif action == "g" and len(data) == 3:
+            await query.answer()
+            gid = int(data[2])
+            titles = dict(await service.group_titles(bot.id))
+            await service.choose_group(sid, gid, titles.get(gid, str(gid)))
+        elif action == "x":
+            await query.answer("Cancelled")
+            await bot.edit_message_text(
+                "✖ Cancelled.", chat_id=owner, message_id=query.message.message_id,
+            )
         else:
             await query.answer()
 

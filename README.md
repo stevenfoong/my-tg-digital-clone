@@ -85,6 +85,10 @@ If it ever leaks: Telegram → Settings → Devices → terminate that session.
 - Buttons switch modes or regenerate. **Custom** asks what you want to say.
   Replying to a suggestion message with text does the same.
 - 📤 **Send N** → ✅ **Confirm** posts it as you, as a reply to the original message.
+- `/draft what you want to say` starts a conversation yourself: pick the group (if the
+  bot watches more than one), get drafts in your style using the group's recent messages
+  as background, reply to the result with changes to redraft, then 📤 Send posts it to
+  the group as you (a new message, not a reply).
 - `/status` shows what's running, `/reload` re-reads `data/prompts.yaml`.
 - `/whoami` in a group replies with the group's chat id (works even before the group
   is listed in `.env`); in a private chat it replies with your user id (for `OWNER_ID`).
