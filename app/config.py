@@ -106,6 +106,7 @@ class Config:
     debounce_seconds: int
     draft_count: int
     leave_unlisted_groups: bool
+    auto_draft: bool
     buffer_limit: int
     log_level: str
     all_groups: set[int] = field(default_factory=set)
@@ -233,6 +234,7 @@ def load_config() -> Config:
         debounce_seconds=_int("DEBOUNCE_SECONDS", 5),
         draft_count=max(1, min(5, _int("DRAFT_COUNT", 3))),
         leave_unlisted_groups=_bool("LEAVE_UNLISTED_GROUPS", False),
+        auto_draft=_bool("AUTO_DRAFT", False),
         buffer_limit=_int("BUFFER_LIMIT", 200),
         log_level=(_env("LOG_LEVEL", "INFO") or "INFO").upper(),
     )

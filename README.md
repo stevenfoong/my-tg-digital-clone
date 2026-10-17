@@ -78,7 +78,10 @@ If it ever leaks: Telegram → Settings → Devices → terminate that session.
 
 ## Using it
 
-- Mentioned in a group → you get a private message with drafts. Tap a draft to copy it.
+- Mentioned in a group → you get a private message asking how to reply: pick 💬 Reply,
+  👍 Acknowledge or 🔎 Gather info, or just reply to that message with what you want to
+  say for custom drafts. The AI is only called after you choose (set `AUTO_DRAFT=true`
+  to get normal drafts immediately instead). Tap a draft to copy it.
 - Buttons switch modes or regenerate. **Custom** asks what you want to say.
   Replying to a suggestion message with text does the same.
 - 📤 **Send N** → ✅ **Confirm** posts it as you, as a reply to the original message.

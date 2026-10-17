@@ -90,7 +90,7 @@ def make_cfg(tmp_path):
         llm=LLMConfig("ollama", "https://x", "m", 5, {}, None, 0.5),
         telethon=TelethonConfig(False, None, None, "x"),
         data_dir=tmp_path, prompts_file=None, context_messages=30, debounce_seconds=0,
-        draft_count=3, leave_unlisted_groups=False, buffer_limit=200, log_level="INFO",
+        draft_count=3, leave_unlisted_groups=False, auto_draft=True, buffer_limit=200, log_level="INFO",
         all_groups={GROUP},
     )
 
@@ -269,3 +269,28 @@ async def test_whoami_in_group_and_private(env):
     await feed(cmd({"id": 999, "type": "private"}))
     reply = session.of(SendMessage)[-1]
     assert reply.chat_id == 999 and "Your user id: <code>999</code>" in reply.text
+
+
+async def test_choose_first_then_direct_custom(env):
+    cfg, session, bot, llm, me, service, feed = env
+    cfg.auto_draft = False
+    await feed(group_msg(1, 6, "Ben", "Steven can you check the VPN"))
+    assert llm.prompts == []  # no AI call until you choose
+    view = session.of(SendMessage)[-1]
+    assert "How do you want to reply" in view.text
+    labels = [b.text for row in view.reply_markup.inline_keyboard for b in row]
+    assert labels == ["💬 Reply", "👍 Acknowledge", "🔎 Gather info", "✍️ Custom"]
+
+    # Replying straight to the notification gives custom drafts in one step.
+    s = service.store.get_suggestion(1)
+    await feed(private_msg("will check tonight", reply_to_id=s.owner_msg_id))
+    assert len(llm.prompts) == 1 and "My intent: will check tonight" in llm.prompts[0][1]
+    assert "draft 1" in session.of(EditMessageText)[-1].text
+
+
+async def test_choose_first_then_mode_button(env):
+    cfg, session, bot, llm, me, service, feed = env
+    cfg.auto_draft = False
+    await feed(group_msg(1, 6, "Ben", "Steven server down"))
+    await feed(button("m:1:ack"))
+    assert len(llm.prompts) == 1 and "acknowledgement" in llm.prompts[0][1]

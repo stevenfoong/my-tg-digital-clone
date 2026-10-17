@@ -55,6 +55,34 @@ def drafting(s: Suggestion) -> str:
     return f"{header(s)}\n\n⏳ <i>Drafting ({label})…</i>"
 
 
+def choose(s: Suggestion, note: str | None = None) -> str:
+    """First message: no AI call yet, the owner picks how to reply."""
+    parts = [
+        header(s),
+        "<b>How do you want to reply?</b>\n"
+        "<i>Pick a style below, or reply to this message with what you want to say "
+        "(e.g. <code>will check tonight</code>) to get custom drafts straight away. "
+        "Reply with</i> <code>/send your text</code> <i>to send exactly that.</i>",
+    ]
+    if note:
+        parts.append(note)
+    text = "\n\n".join(parts)
+    return text if len(text) <= TG_LIMIT else text[: TG_LIMIT - 1] + "…"
+
+
+def choose_keyboard(s: Suggestion) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=MODE_LABELS["reply"], callback_data=f"m:{s.id}:reply"),
+            InlineKeyboardButton(text=MODE_LABELS["ack"], callback_data=f"m:{s.id}:ack"),
+        ],
+        [
+            InlineKeyboardButton(text=MODE_LABELS["gather"], callback_data=f"m:{s.id}:gather"),
+            InlineKeyboardButton(text=MODE_LABELS["custom"], callback_data=f"k:{s.id}"),
+        ],
+    ])
+
+
 def can_send(s: Suggestion, me_ready: bool) -> bool:
     return me_ready and s.chat_id is not None and not s.sent
 

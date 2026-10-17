@@ -199,7 +199,13 @@ class Service:
         assert s
         bot = self.bots[s.bot_id]
         try:
-            msg = await bot.send_message(self.cfg.owner_id, fmt.drafting(s), parse_mode="HTML")
+            if self.cfg.auto_draft:
+                msg = await bot.send_message(self.cfg.owner_id, fmt.drafting(s), parse_mode="HTML")
+            else:
+                msg = await bot.send_message(
+                    self.cfg.owner_id, fmt.choose(s, note=note), parse_mode="HTML",
+                    reply_markup=fmt.choose_keyboard(s),
+                )
         except TelegramForbiddenError:
             log.error(
                 "Can't message you: open a private chat with this bot and press Start once (bot id %s)",
@@ -207,7 +213,8 @@ class Service:
             )
             return
         self.store.update_suggestion(sid, owner_msg_id=msg.message_id)
-        await self.redraft(sid, note=note)
+        if self.cfg.auto_draft:
+            await self.redraft(sid, note=note)
 
     async def redraft(self, sid: int, mode: str | None = None, intent: str | None = None,
                       fresh: bool = False, note: str | None = None) -> None:
